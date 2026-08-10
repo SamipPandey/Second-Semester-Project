@@ -1,0 +1,4 @@
+#1:repeating
+#0:algorithm
+===END_DICT===
+The #0 processes the incoming text stream and analyzes the word frequency. When the #0 finds #1 patterns, the #0 assigns a token to each #1 word. This process allows the #0 to reduce the total size of the text stream. Using a good #0 ensures that the compression ratio remains high while the overall #0 execution speed stays fast.
