@@ -17,7 +17,7 @@ class CompressorEngine {
 private:
     const string HEADER_DELIMITER = "===END_DICT===";
 
-    unordered_map<string, string> buildDictionary(const string& text) {
+    unordered_map<string, char> buildDictionary(const string& text) {
         unordered_map<string, size_t> freqs;
         stringstream ss(text);
         string word;
@@ -28,7 +28,7 @@ private:
 
         vector<WordStats> candidates;
         for (const auto& [w, count] : freqs) {
-            if (count > 1 && w.length() > 3) {
+            if (count > 1 && w.length() > 2) {
                 candidates.push_back({w, count});
             }
         }
@@ -37,17 +37,21 @@ private:
             return (a.word.length() * a.count) > (b.word.length() * b.count);
         });
 
-        unordered_map<string, string> wordToToken;
-        int tokenID = 0;
+        unordered_map<string, char> wordToToken;
+        unsigned char currentByteToken = 128; 
 
         for (const auto& item : candidates) {
-            string token = "#" + to_string(tokenID);
-            size_t originalSize = item.word.length() * item.count;
-            size_t compressedSize = (token.length() * item.count) + item.word.length() + token.length() + 2;
+            if (currentByteToken == 255) break;
 
-            if (originalSize > compressedSize) {
+            char token = static_cast<char>(currentByteToken);
+
+            size_t originalSize = item.word.length() * item.count;
+            size_t bodyTokenCost = 1 * item.count; 
+            size_t headerCost = item.word.length() + 3;
+
+            if (originalSize > (bodyTokenCost + headerCost)) {
                 wordToToken[item.word] = token;
-                tokenID++;
+                currentByteToken++;
             }
         }
 
@@ -75,13 +79,11 @@ public:
             return false;
         }
 
-        // Output header dictionary
         for (const auto& [word, token] : wordToToken) {
             outFile << token << ":" << word << "\n";
         }
         outFile << HEADER_DELIMITER << "\n";
 
-        // Output compressed content body
         stringstream ss(content);
         string word;
         bool first = true;
@@ -109,10 +111,9 @@ public:
             return false;
         }
 
-        unordered_map<string, string> tokenToWord;
+        unordered_map<char, string> tokenToWord;
         string line;
 
-        // Parse header dictionary
         while (getline(inFile, line)) {
             if (!line.empty() && line.back() == '\r') {
                 line.pop_back();
@@ -123,8 +124,8 @@ public:
             }
 
             size_t pos = line.find(':');
-            if (pos != string::npos) {
-                string token = line.substr(0, pos);
+            if (pos != string::npos && pos > 0) {
+                char token = line[0];
                 string word = line.substr(pos + 1);
                 tokenToWord[token] = word;
             }
@@ -136,7 +137,6 @@ public:
             return false;
         }
 
-        // Reconstruct original file content
         string token;
         bool first = true;
 
@@ -144,8 +144,8 @@ public:
             if (!first) outFile << " ";
             first = false;
 
-            if (tokenToWord.count(token)) {
-                outFile << tokenToWord[token];
+            if (token.length() == 1 && tokenToWord.count(token[0])) {
+                outFile << tokenToWord[token[0]];
             } else {
                 outFile << token;
             }
@@ -163,7 +163,7 @@ int main() {
     int choice = 0;
 
     cout << "====================================\n";
-    cout << "    File Compressor & Decompressor  \n";
+    cout << "     File Compressor & Decompressor  \n";
     cout << "====================================\n";
     cout << "1. Compress a text file\n";
     cout << "2. Decompress a file\n";
