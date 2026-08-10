@@ -297,6 +297,12 @@ int Dictionary::size() const {
 void Compressor::analyzeAndBuildDictionary(
     const std::vector<Tokenizer::TextToken>& tokens
 ) {
+    // Step 0: Reset state for a fresh compression operation
+    // WHY: Prevents leftover entries or incremented token IDs when running
+    //      multiple compression passes using the same Compressor instance
+    dictionary.clear();
+    tokenAllocator.reset();
+
     // Phase 1a: Frequency analysis - count word occurrences
     // WHY: Identifies which words repeat enough to consider for compression
     auto frequencyMap = FrequencyAnalyzer::analyze(tokens);
@@ -305,27 +311,30 @@ void Compressor::analyzeAndBuildDictionary(
     // WHY: Words with frequency < 2 cannot produce positive savings
     auto candidates = CandidateGenerator::generateCandidates(frequencyMap);
     
-    // Phase 1c: Profitability analysis and dictionary building
-    // WHY: Each candidate is evaluated; only profitable words are added
+    // Phase 1c: Profitability analysis and sequential token assignment
+    // WHY: Evaluates candidate words and only allocates token IDs to profitable
+    //      entries so that the resulting dictionary contains zero gaps
     for (const auto& word : candidates) {
-        int frequency = frequencyMap[word];
-        std::string token = tokenAllocator.nextToken();
-        
-        // Calculate if this word is worth compressing
-        auto savings = SavingsCalculator::calculateSavings(word, frequency, token);
-        
-        // Only add to dictionary if it saves space
-        // WHY: No point compressing if it doesn't reduce file size
+        int frequency = frequencyMap.at(word);
+
+        // Peek at the expected token ID without advancing the internal counter
+        // WHY: Evaluates exact character length of the upcoming token ID
+        //      (e.g., "#9" vs "#10") without consuming the number prematurely
+        std::string nextExpectedToken = tokenAllocator.peekNextToken();
+
+        // Calculate profitability based on the expected token length
+        // WHY: Ensures calculations reflect the exact overhead incurred by the token
+        auto savings = SavingsCalculator::calculateSavings(word, frequency, nextExpectedToken);
+
+        // Only assign and increment token ID if net savings are positive
+        // WHY: Guarantees that token IDs (#0, #1, #2...) remain perfectly
+        //      sequential without gaps caused by discarded candidates
         if (savings.isProfitable) {
-            dictionary.addEntry(word, token);
-            
-            // Debug output for verification (optional)
-            // std::cout << "Added: " << word << " -> " << token 
-            //           << " (saving " << savings.netSaving << " bytes)" << std::endl;
+            std::string actualToken = tokenAllocator.nextToken();
+            dictionary.addEntry(word, actualToken);
         }
     }
 }
-
 // WHAT THIS DOES: Main compression pipeline
 // WHY AND INTENT: Orchestrates reading input, analyzing, building dictionary,
 //                  replacing words, and writing compressed .cmp file
