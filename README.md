@@ -1,61 +1,73 @@
-# File Compressor & Decompressor
+# Byte-Token File Compressor & Decompressor
 
-A simple C++ command-line tool that compresses text files using **word-frequency dictionary substitution**. Frequently repeated words are replaced with short tokens (e.g. `#0`, `#1`) to reduce file size, and the process can be reversed to restore the original file.
+A lightweight C++ text compression utility that implements single-byte dictionary substitution. The program scans plain text files, identifies high-frequency words, and dynamically substitutes them with single-byte binary tokens (extended ASCII range `0x80`–`0xFF`) to achieve measurable file size reduction.
+
+## Key Features
+
+- **Single-Byte Tokenization**: Uses extended ASCII values (`128`–`255`) as substitution tokens. Each compressed dictionary word occupies exactly 1 byte in the compressed file body.
+- **Profitability Calculation**: Analyzes total byte savings before replacing any word, accounting for dictionary header overhead and spacing to guarantee space efficiency.
+- **Header Dictionary**: Embeds a compact key-value map at the top of the compressed file for fast, standalone decompression.
+- **Header Boundary Protection**: Uses a custom delimiter (`===END_DICT===`) to separate compressed metadata from the body.
 
 ## How It Works
 
-1. **Dictionary Building** — The compressor scans the input file and counts word frequencies. Words longer than 3 characters that appear more than once are considered candidates for tokenization.
-2. **Smart Selection** — Candidates are sorted by potential savings (word length × frequency), and each word is only tokenized if doing so actually reduces the total size (accounting for the space the token takes up in the dictionary header).
-3. **Encoding** — The compressed file stores a header dictionary (`token:word` pairs) followed by a delimiter (`===END_DICT===`), then the body of the text with selected words replaced by their tokens.
-4. **Decoding** — The decompressor reads the header to rebuild the token-to-word mapping, then reconstructs the original text by replacing tokens with their corresponding words.
+1. **Analysis & Frequency Count**: Reads the input document and tallies frequency counts for every space-delimited word.
+2. **Profitability Check**: Ranks words by potential byte savings using the formula:
 
-## Requirements
+   $$\text{Original Size} > \text{Body Token Cost} + \text{Header Overhead}$$
 
-- A C++ compiler supporting C++17 (e.g. `g++`, `clang++`)
+3. **Dictionary Mapping**: Selects up to 128 of the most profitable candidate words and assigns each a unique 1-byte binary token.
+4. **Encoding**: Writes the dictionary header and body text replaced with 1-byte binary tokens to an output file.
+5. **Decoding**: Reads the header map, reconstructs the dictionary, and streams original text words back into the destination file.
 
-## Build
+## Build Instructions
+
+Compile using any C++17-compliant standard compiler (GCC, Clang, MSVC):
 
 ```bash
-g++ -std=c++17 -O2 -o compressor main.cpp
+g++ -std=c++17 main.cpp -o compressor
 ```
 
 ## Usage
 
-Run the compiled program and follow the interactive prompts:
+Run the compiled executable and follow the interactive menu prompts:
 
 ```bash
 ./compressor
 ```
 
-You'll see a menu:
+### Menu Options
+
+```
 ====================================
-File Compressor & Decompressor
-Compress a text file
-Decompress a file
-Exit
-Enter your choice (1-3):
-
-### Compress a file
-Choose option `1`, then provide:
-- Source input filename (e.g. `input.txt`)
-- Target output filename (e.g. `compressed.cmp`)
-
-### Decompress a file
-Choose option `2`, then provide:
-- Compressed filename (e.g. `compressed.cmp`)
-- Target output filename (e.g. `restored.txt`)
+     File Compressor & Decompressor  
+====================================
+1. Compress a text file
+2. Decompress a file
+3. Exit
+```
 
 ## Example
 
-```bash
-./compressor
-# Choose 1, input.txt -> compressed.cmp
-./compressor
-# Choose 2, compressed.cmp -> restored.txt
+### 1. Compress a File
+
+```
+Enter your choice (1-3): 1
+Enter source input filename (e.g., input.txt): document.txt
+Enter target output filename (e.g., compressed.cmp): document.cmp
+Successfully compressed: 'document.txt' -> 'document.cmp'
 ```
 
-## Limitations
+### 2. Decompress a File
 
-- Whitespace formatting (multiple spaces, tabs, newlines) is **not preserved** — the decompressed file will have words separated by single spaces.
-- Compression works best on text with many repeated, longer words (e.g. technical documents, logs).
-- Not intended as a general-purpose or production-grade compression algorithm — it's a lightweight demonstration of dictionary-based text substitution.
+```
+Enter your choice (1-3): 2
+Enter compressed filename (e.g., compressed.cmp): document.cmp
+Enter target output filename (e.g., restored.txt): document_restored.txt
+Successfully decompressed: 'document.cmp' -> 'document_restored.txt'
+```
+
+## Requirements
+
+- **C++ Compiler**: Supporting C++17 or higher
+- **File Support**: Plain text (`.txt`, `.log`, `.md`, `.cpp`, etc.) with emoji use also
