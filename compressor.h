@@ -166,14 +166,21 @@ private:
 public:
     TokenAllocator() : nextId(0) {}
     
-    // WHAT THIS DOES: Returns the next sequential token ID
+    // WHAT THIS DOES: Returns the next sequential token ID and increments internal state
     // WHY AND INTENT: Guarantees each word gets a unique, compact token
-    //                  like #0, #1, #2, etc.
+    //                  like #0, #1, #2, etc., upon actual dictionary insertion
     std::string nextToken();
     
+    // WHAT THIS DOES: Inspects the upcoming token string without advancing nextId
+    // WHY AND INTENT: Allows SavingsCalculator to evaluate exact string length overhead
+    //                  before deciding whether to commit the token ID
+    std::string peekNextToken() const {
+        return "#" + std::to_string(nextId);
+    }
+    
     // WHAT THIS DOES: Resets the allocator for a fresh compression run
-    // WHY AND INTENT: Allows reusing the allocator in tests without
-    //                  creating new objects
+    // WHY AND INTENT: Allows reusing the allocator across multiple compression passes
+    //                  or test cases while restarting ID assignment at #0
     void reset();
 };
 
